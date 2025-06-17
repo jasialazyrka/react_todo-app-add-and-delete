@@ -32,7 +32,7 @@ const getFilteredTodos = (todos: Todo[], filter: GetFilteredTodosFilter) => {
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [todosLoading, setTodosLoading] = useState(true);
+  const [todosLoading, setTodosLoading] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<ErrorMessages | null>(null);
 

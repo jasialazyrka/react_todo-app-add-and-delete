@@ -14,18 +14,25 @@ export const TodoCreateForm = forwardRef<HTMLInputElement, TodoCreateFormProps>(
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!newTodoTitle.trim()) {
+      const normalizedNewTitle = newTodoTitle.trim();
+
+      if (!normalizedNewTitle) {
         onError(ErrorMessages.EmptyTitle);
 
         return;
       }
 
-      onSubmit(newTodoTitle).then(() => setNewTodoTitle(''));
+      onError(null);
+
+      onSubmit(normalizedNewTitle)
+        .then(() => setNewTodoTitle(''))
+        .catch(() => {});
     };
 
     return (
       <form onSubmit={handleSubmit}>
         <input
+          autoFocus
           ref={ref}
           data-cy="NewTodoField"
           type="text"
