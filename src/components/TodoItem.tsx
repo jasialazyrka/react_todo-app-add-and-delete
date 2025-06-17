@@ -6,10 +6,11 @@ import cn from 'classnames';
 
 interface TodoItemProps {
   todo: Todo;
-  onDeleteTodo: (number: Todo['id']) => void;
+  onDeleteTodo: (todoId: Todo['id']) => void;
+  isLoading: boolean;
 }
 
-export const TodoItem = ({ todo, onDeleteTodo }: TodoItemProps) => {
+export const TodoItem = ({ todo, onDeleteTodo, isLoading }: TodoItemProps) => {
   return (
     <div
       data-cy="Todo"
@@ -39,8 +40,12 @@ export const TodoItem = ({ todo, onDeleteTodo }: TodoItemProps) => {
         ×
       </button>
 
-      {/* overlay will cover the todo while it is being deleted or updated */}
-      <div data-cy="TodoLoader" className="modal overlay">
+      <div
+        data-cy="TodoLoader"
+        className={cn('modal overlay', {
+          'is-active': isLoading,
+        })}
+      >
         <div className="modal-background has-background-white-ter" />
         <div className="loader" />
       </div>

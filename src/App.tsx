@@ -1,6 +1,7 @@
-/* eslint-disable max-len */
+/* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, { useCallback, useEffect, useState } from 'react';
+/* eslint-disable max-len */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { UserWarning } from './UserWarning';
 import { getTodos, USER_ID, addTodo, deleteTodo } from './api/todos';
 import { Todo } from './types/Todo';
@@ -9,7 +10,7 @@ import { ErrorNotification } from './components/ErrorNotification';
 import { TodoItem } from './components/TodoItem';
 import { StatusFilterOptions } from './types/StatusFilterOptions';
 import { FilterByStatus } from './components/FilterByStatus';
-import { Header } from './components/Header';
+import { TodoCreateForm } from './components/TodoCreateForm';
 
 interface GetFilteredTodosFilter {
   status: StatusFilterOptions;
@@ -40,9 +41,9 @@ export const App: React.FC = () => {
   );
 
   const [processingTodoIds, setProcessingTodoIds] = useState<Todo['id'][]>([]); //All Todos that processing at the momemnt
+  const [temporaryTodo, setTemporaryTodo] = useState<Todo | null>(null);
 
-  const [newTodoTitle, setNewTodoTitle] = useState<string>('');
-  const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  const createFormRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadTodos() {
@@ -60,55 +61,69 @@ export const App: React.FC = () => {
     loadTodos();
   }, []);
 
-  const handleCreateTodo = async (title: string): Promise<void> => {
-    //creatingTodo
-    if (!title.trim()) {
-      setErrorMessage(ErrorMessages.EmptyTitle);
+  const handleCreateTodo = useCallback(
+    async (title: Todo['title']): Promise<Todo> => {
+      if (createFormRef.current) {
+        createFormRef.current.disabled = true;
+      }
 
-      return;
-    }
+      const newTodo = {
+        title,
+        completed: false,
+        userId: USER_ID,
+      };
 
-    setTodosLoading(true);
+      const tempTodo: Todo = {
+        id: 0,
+        ...newTodo,
+      };
 
-    const newTodo = {
-      id: 0,
-      userId: USER_ID,
-      title: title.trim(),
-      completed: false,
-    };
+      setTemporaryTodo(tempTodo);
 
-    setTempTodo(newTodo);
+      try {
+        const createTodo = await addTodo(newTodo);
 
-    try {
-      const createdTodo = await addTodo(newTodo);
+        setTodos(currentTodos => [...currentTodos, createTodo]);
 
-      setTodos(currentTodos => [...currentTodos, createdTodo]);
-      setNewTodoTitle('');
-    } catch {
-      setErrorMessage(ErrorMessages.AddTodo);
-    } finally {
-      setTodosLoading(false);
-      setTempTodo(null);
-    }
-  };
+        return createTodo;
+      } catch {
+        setErrorMessage(ErrorMessages.AddTodo);
+        throw new Error(ErrorMessages.AddTodo);
+      } finally {
+        setTemporaryTodo(null);
+        if (createFormRef.current) {
+          createFormRef.current.disabled = false;
+          createFormRef.current.focus();
+        }
+      }
+    },
+    [],
+  );
 
-  const handleDeleteTodo = async (todoId: Todo['id']) => {
-    setProcessingTodoIds(currentIds => [...currentIds, todoId]);
-
+  const handleDeleteTodo = useCallback(async (todoId: Todo['id']) => {
+    setProcessingTodoIds(curr => [...curr, todoId]);
     try {
       await deleteTodo(todoId);
-      setTodos(todos => todos.filter(todo => todo.id !== todoId));
-    } catch {
+      setTodos(current => current.filter(todo => todo.id !== todoId));
+
+      if (createFormRef.current) {
+        createFormRef.current.focus();
+      }
+    } catch (error) {
       setErrorMessage(ErrorMessages.DeleteTodo);
     } finally {
-      setProcessingTodoIds(currentIds =>
-        currentIds.filter(id => id !== todoId),
-      );
+      setProcessingTodoIds(current => current.filter(id => id !== todoId));
     }
-  };
+  }, []);
 
   const completedTodos = todos.filter(todo => todo.completed);
   const activeTodos = todos.length - completedTodos.length;
+
+  const handleClearCompleted = useCallback(() => {
+    completedTodos.forEach(completedTodo => {
+      handleDeleteTodo(completedTodo.id);
+    });
+  }, [completedTodos, handleDeleteTodo]);
 
   const handleHideError = useCallback(() => setErrorMessage(null), []);
 
@@ -127,12 +142,21 @@ export const App: React.FC = () => {
       <h1 className="todoapp__title">todos</h1>
 
       <div className="todoapp__content">
-        <Header
-          newTodoTitle={newTodoTitle}
-          setNewTodoTitle={setNewTodoTitle}
-          createTodo={handleCreateTodo}
-          todosLoading={todosLoading}
-        />
+        <header className="todoapp__header">
+          <button
+            type="button"
+            className="todoapp__toggle-all active"
+            data-cy="ToggleAllButton"
+          />
+
+          <TodoCreateForm
+            ref={createFormRef}
+            onSubmit={handleCreateTodo}
+            onError={setErrorMessage}
+            todosLoading={todosLoading}
+          />
+        </header>
+
         {!todosLoading && (
           <>
             <section className="todoapp__main" data-cy="TodoList">
@@ -141,33 +165,17 @@ export const App: React.FC = () => {
                   key={todo.id}
                   todo={todo}
                   onDeleteTodo={handleDeleteTodo}
+                  isLoading={processingTodoIds.includes(todo.id)}
                 />
               ))}
-              {/* <div data-cy="Todo" className="todo">
-                <label className="todo__status-label">
-                  <input
-                    data-cy="TodoStatus"
-                    type="checkbox"
-                    className="todo__status"
-                  />
-                </label>
 
-              {/* This form is shown instead of the title and remove button */}
-              {/* <form>
-                  <input
-                    data-cy="TodoTitleField"
-                    type="text"
-                    className="todo__title-field"
-                    placeholder="Empty todo will be deleted"
-                    value="Todo is being edited now"
-                  />
-                </form> */}
-
-              {/* <div data-cy="TodoLoader" className="modal overlay">
-                  <div className="modal-background has-background-white-ter" />
-                  <div className="loader" />
-                </div>
-              </div> */}
+              {temporaryTodo && (
+                <TodoItem
+                  todo={temporaryTodo}
+                  onDeleteTodo={() => {}}
+                  isLoading
+                />
+              )}
             </section>
 
             {showFooter && (
@@ -181,15 +189,12 @@ export const App: React.FC = () => {
                   onStatusFilterChange={setFilterStatus}
                 />
 
-                {/* this button should be disabled if there are no completed todos */}
                 <button
                   type="button"
                   className="todoapp__clear-completed"
                   data-cy="ClearCompletedButton"
-                  disabled={completedTodos.length === 0}
-                  onClick={() => {
-                    completedTodos.forEach(todo => handleDeleteTodo(todo.id));
-                  }}
+                  disabled={!completedTodos.length}
+                  onClick={handleClearCompleted}
                 >
                   Clear completed
                 </button>
